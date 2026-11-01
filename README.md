@@ -2,7 +2,7 @@
 
 Interactive Streamlit dashboard for FIFA 21 player ratings. It looks at how overall rating and potential change with age, which countries and clubs have the highest-rated players, and which positions still have room to grow.
 
-**Live app:** (add the Streamlit Community Cloud URL here after deploy)
+**Live app:** [https://fifa-21-player-explorer.streamlit.app/](https://fifa-21-player-explorer.streamlit.app/)
 
 ## Audience
 
