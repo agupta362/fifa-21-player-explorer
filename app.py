@@ -157,8 +157,9 @@ m3.metric("Average potential", f"{filtered['potential'].mean():.1f}")
 m4.metric("Average growth", f"{filtered['growth'].mean():.1f}")
 
 st.subheader("📈 Visualizations")
+st.markdown("Each chart answers one question from the proposal. The text under the chart is the finding, not just a label.")
 
-st.markdown("#### Q1 · Average overall and potential by age")
+st.markdown("#### Chart 1 · Average overall and potential by age *(Q1)*")
 age_summary = (
     filtered.groupby("age")
     .agg(avg_overall=("overall", "mean"), avg_potential=("potential", "mean"), n=("player_id", "count"))
@@ -169,11 +170,11 @@ age_plot = age_summary[age_summary["n"] >= 15]
 if len(age_plot) < 2:
     st.info("Not enough players at each age to draw this chart. Widen the age range or turn off Wonderkids only.")
 else:
-    fig, ax = plt.subplots(figsize=(11, 4.2))
+    fig, ax = plt.subplots(figsize=(11, 4.6))
     ax.plot(age_plot["age"], age_plot["avg_overall"], marker="o", color=LINE_OVERALL, linewidth=2.2, label="Average overall")
     ax.plot(age_plot["age"], age_plot["avg_potential"], marker="o", color=LINE_POTENTIAL, linewidth=2.2, label="Average potential")
-    ax.fill_between(age_plot["age"], age_plot["avg_overall"], age_plot["avg_potential"], color=LINE_POTENTIAL, alpha=0.18)
-    ax.set_title("How ratings change as players get older")
+    ax.fill_between(age_plot["age"], age_plot["avg_overall"], age_plot["avg_potential"], color=LINE_POTENTIAL, alpha=0.18, label="Remaining growth")
+    ax.set_title("How FIFA ratings change as players get older")
     ax.set_xlabel("Age")
     ax.set_ylabel("FIFA rating")
     ax.legend(frameon=False)
@@ -183,72 +184,84 @@ else:
     gap = (age_plot["avg_potential"] - age_plot["avg_overall"]).abs()
     close_age = int(age_plot.loc[gap.idxmin(), "age"])
     young = age_plot.iloc[0]
-    st.caption(
-        f"At age {int(young['age'])}, average overall is {young['avg_overall']:.1f}. "
-        f"Overall and potential are closest at age {close_age}. "
-        "The shaded gap is remaining growth. Ages with fewer than 15 players are left off."
+    st.markdown(
+        f"""
+**What it shows.** Average overall at age {int(young['age'])} is {young['avg_overall']:.1f}.
+Potential starts higher and the two lines meet around age {close_age}.
+The shaded gap is remaining growth. Ages with fewer than 15 players are left off so a few veterans do not skew the line.
+
+**Why it matters.** Career Mode players should look at that gap before buying a “high potential” player.
+It is wide for teenagers and mostly gone by the late 20s.
+"""
     )
 
-left, right = st.columns(2)
+st.markdown("#### Chart 2 · Highest average overall by country or club *(Q2)*")
+group_col = "nationality" if rank_by == "Nationality" else "team"
+ranked = (
+    filtered.groupby(group_col)
+    .agg(avg_overall=("overall", "mean"), n=("player_id", "count"))
+    .query("n >= @min_players")
+    .sort_values("avg_overall")
+    .tail(15)
+)
+if ranked.empty:
+    st.info("No group has enough players for this chart. Lower the minimum-players slider.")
+else:
+    fig, ax = plt.subplots(figsize=(11, 6.2))
+    ax.barh(ranked.index.astype(str), ranked["avg_overall"], color=BAR_COLOR, edgecolor="black", linewidth=0.4)
+    for y, (_, row) in enumerate(ranked.iterrows()):
+        ax.text(row["avg_overall"] + 0.08, y, f"{row['avg_overall']:.1f}  (n={int(row['n'])})", va="center", fontsize=9)
+    noun = "nationalities" if group_col == "nationality" else "clubs"
+    ax.set_title(f"Top {noun} by average overall (at least {min_players} players)")
+    ax.set_xlabel("Average overall rating")
+    ax.set_xlim(ranked["avg_overall"].min() - 1.2, ranked["avg_overall"].max() + 3.6)
+    fig.tight_layout()
+    show_fig(fig)
 
-with left:
-    st.markdown("#### Q2 · Highest average overall")
-    group_col = "nationality" if rank_by == "Nationality" else "team"
-    ranked = (
-        filtered.groupby(group_col)
-        .agg(avg_overall=("overall", "mean"), n=("player_id", "count"))
-        .query("n >= @min_players")
-        .sort_values("avg_overall")
-        .tail(12)
+    best_name = ranked["avg_overall"].idxmax()
+    best = ranked.loc[best_name]
+    st.markdown(
+        f"""
+**What it shows.** **{best_name}** is first in this view, with an average overall of {best['avg_overall']:.1f}
+across {int(best['n']):,} players. Switch Rank by to Club, or change the minimum-players slider, to see a different ranking.
+
+**Why it matters.** A country can have a lot of players without having the highest average.
+The minimum-player cutoff stops a tiny group from looking like the best in the world.
+"""
     )
-    if ranked.empty:
-        st.info("No group has enough players for this chart. Lower the minimum-players slider.")
-    else:
-        fig, ax = plt.subplots(figsize=(6.5, 5.6))
-        ax.barh(ranked.index.astype(str), ranked["avg_overall"], color=BAR_COLOR, edgecolor="black", linewidth=0.4)
-        for y, (_, row) in enumerate(ranked.iterrows()):
-            ax.text(row["avg_overall"] + 0.08, y, f"{row['avg_overall']:.1f} (n={int(row['n'])})", va="center", fontsize=8)
-        noun = "nationalities" if group_col == "nationality" else "clubs"
-        ax.set_title(f"Top {noun} (min {min_players} players)")
-        ax.set_xlabel("Average overall rating")
-        ax.set_xlim(ranked["avg_overall"].min() - 1.2, ranked["avg_overall"].max() + 3.4)
-        fig.tight_layout()
-        show_fig(fig)
 
-        best_name = ranked["avg_overall"].idxmax()
-        best = ranked.loc[best_name]
-        st.caption(
-            f"{best_name} leads this view at {best['avg_overall']:.1f} overall "
-            f"({int(best['n']):,} players). The minimum-player cutoff stops tiny groups from looking strongest."
-        )
+st.markdown("#### Chart 3 · Overall rating and remaining growth by position *(Q3)*")
+counts = filtered["primary_position"].value_counts()
+keep = counts[counts >= 30].index
+pos_df = filtered[filtered["primary_position"].isin(keep)].copy()
+order = [p for p in POS_ORDER if p in set(pos_df["primary_position"])]
+if not order:
+    st.info("No position has at least 30 players in this filter.")
+else:
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8))
+    sns.boxplot(data=pos_df, x="primary_position", y="overall", order=order, color=BOX_COLOR, ax=axes[0])
+    axes[0].set_title("Overall rating by primary position")
+    axes[0].set_xlabel("Primary position")
+    axes[0].set_ylabel("Overall rating")
 
-with right:
-    st.markdown("#### Q3 · Rating and growth by position")
-    counts = filtered["primary_position"].value_counts()
-    keep = counts[counts >= 30].index
-    pos_df = filtered[filtered["primary_position"].isin(keep)].copy()
-    order = [p for p in POS_ORDER if p in set(pos_df["primary_position"])]
-    if not order:
-        st.info("No position has at least 30 players in this filter.")
-    else:
-        fig, axes = plt.subplots(2, 1, figsize=(6.5, 5.6), gridspec_kw={"height_ratios": [1.15, 1]})
-        sns.boxplot(data=pos_df, x="primary_position", y="overall", order=order, color=BOX_COLOR, ax=axes[0])
-        axes[0].set_title("Overall rating by position")
-        axes[0].set_xlabel("")
-        axes[0].set_ylabel("Overall")
+    growth = pos_df.groupby("primary_position")["growth"].mean().reindex(order)
+    axes[1].bar(growth.index.astype(str), growth.values, color=GROWTH_COLOR, edgecolor="black", linewidth=0.4)
+    axes[1].set_title("Average remaining growth by position")
+    axes[1].set_xlabel("Primary position")
+    axes[1].set_ylabel("Average growth (potential − overall)")
+    fig.tight_layout()
+    show_fig(fig)
 
-        growth = pos_df.groupby("primary_position")["growth"].mean().reindex(order)
-        axes[1].bar(growth.index.astype(str), growth.values, color=GROWTH_COLOR, edgecolor="black", linewidth=0.4)
-        axes[1].set_title("Average remaining growth")
-        axes[1].set_xlabel("Primary position")
-        axes[1].set_ylabel("Growth")
-        fig.tight_layout()
-        show_fig(fig)
+    st.markdown(
+        f"""
+**What it shows.** Current overall is similar across most positions. Remaining growth is not.
+**{growth.idxmax()}** has the most unused potential ({growth.max():.1f} points on average).
+Positions with fewer than 30 players in this filter are hidden.
 
-        st.caption(
-            f"{growth.idxmax()} has the most remaining growth ({growth.max():.1f} points). "
-            "Overall is similar across positions; unused potential is not. Positions with fewer than 30 players are hidden."
-        )
+**Why it matters.** If you want a player who can still rise in Career Mode, look at wide attackers and midfielders.
+If you need a finished player now, pay for current overall instead of potential.
+"""
+    )
 
 st.subheader("📋 Players in this filter")
 st.caption("Top 50 by potential, then overall.")
