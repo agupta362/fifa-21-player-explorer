@@ -17,15 +17,18 @@ Football fans and FIFA players, especially Career Mode and Ultimate Team players
 ## Dataset
 
 - **Source:** [FIFA 2021 Complete Player Dataset](https://www.kaggle.com/datasets/aayushmishra1512/fifa-2021-complete-player-data) by Aayush Mishra (CC0). Player ratings originally come from [fifaindex.com](https://www.fifaindex.com/).
-- **File used by the app:** `dashboard_data.csv` (17,981 players).
-- The raw Kaggle file was cleaned in `Deliverable2_FIFA21_Analysis.ipynb` (team names stripped, primary position, position group, growth, age group, free-agent flag, and a wonderkid flag). A small nationality lookup was merged on so each player has a FIFA confederation and region.
+- **Pipeline:** `FIFA-21 Complete.csv` + `fifa_confederations.csv` → cleaned in `Deliverable2_FIFA21_Analysis.ipynb` → `dashboard_data.csv` → loaded by `app.py`.
+- **Raw file:** `FIFA-21 Complete.csv` (17,981 players; semicolon-separated Kaggle file).
+- **Lookup file:** `fifa_confederations.csv` (nationality → FIFA confederation and region).
+- **File used by the app:** `dashboard_data.csv` (cleaned output with primary position, position group, growth, age group, free-agent flag, wonderkid flag, confederation, and region).
 - These are video game ratings, not real match statistics. Club assignments are a snapshot from FIFA 21.
-- Only the cleaned dashboard CSV is in this repo for deployment. The original Kaggle file is not included.
 
 ## Repository files
 
-- `Deliverable2_FIFA21_Analysis.ipynb` — Deliverable 2 analysis notebook
+- `Deliverable2_FIFA21_Analysis.ipynb` — Deliverable 2 analysis / exploration notebook
 - `app.py` — Streamlit dashboard
+- `FIFA-21 Complete.csv` — raw Kaggle dataset
+- `fifa_confederations.csv` — nationality → confederation lookup
 - `dashboard_data.csv` — cleaned data used by the app
 - `requirements.txt` — Python packages
 - `README.md` — this file
